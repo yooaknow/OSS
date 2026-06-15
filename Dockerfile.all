@@ -5,11 +5,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 # ── 시스템 패키지 ──────────────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# policy-rc.d: 설치 중 systemd 서비스 자동 시작 차단 (Docker 내 init 없음)
+RUN echo "exit 101" > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d \
+    && apt-get update && apt-get install -y --no-install-recommends \
         mysql-server \
         python3 \
         python3-pip \
         supervisor \
+    && rm /usr/sbin/policy-rc.d \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/lib/mysql \
     && mkdir -p /var/lib/mysql
