@@ -1,0 +1,37 @@
+# Single-image build: MySQL + FastAPI + Streamlit managed by supervisord
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1
+
+# ── 시스템 패키지 ──────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        mysql-server \
+        python3 \
+        python3-pip \
+        supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── 로그 디렉터리 ──────────────────────────────────────────────────────────────
+RUN mkdir -p /var/log/supervisor
+
+# ── Python 의존성 ──────────────────────────────────────────────────────────────
+COPY back/requirements.txt  /tmp/back-req.txt
+COPY front/requirements.txt /tmp/front-req.txt
+RUN pip3 install --no-cache-dir -r /tmp/back-req.txt -r /tmp/front-req.txt
+
+# ── 소스 코드 ─────────────────────────────────────────────────────────────────
+WORKDIR /app
+COPY back/main.py  back/main.py
+COPY front/app.py  front/app.py
+
+# ── supervisord 설정 ───────────────────────────────────────────────────────────
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# ── 엔트리포인트 ──────────────────────────────────────────────────────────────
+COPY entrypoint-all.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8000 8501
+
+CMD ["/entrypoint.sh"]
