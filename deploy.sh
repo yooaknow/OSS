@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
-#  deploy.sh  ─  단 하나의 명령으로 전체 프로젝트 배포
+#  deploy.sh  ─  단 하나의 명령으로 빌드 → 푸시 → 실행까지 완료
 #
-#  사용법 (EC2 또는 Docker 가 설치된 서버):
+#  사용법 (레포 클론 후 EC2 에서 실행):
 #    bash deploy.sh
 #
 #  이 스크립트는 다음을 자동으로 수행합니다:
 #    1. Docker 미설치 시 자동 설치 (Ubuntu / Amazon Linux 2)
-#    2. DockerHub 에서 All-in-One 이미지 pull
-#    3. 기존 컨테이너 정리 후 새 컨테이너 시작
-#    4. 접속 URL 안내
+#    2. DockerHub 로그인
+#    3. 백엔드 / 프론트엔드 / All-in-One 이미지 빌드
+#    4. 세 이미지 DockerHub 푸시
+#    5. 기존 컨테이너 정리 후 새 컨테이너 실행
+#    6. 접속 URL 안내
 # ─────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 DOCKER_USER="yooahreaum"
-IMAGE="${DOCKER_USER}/travel-all:latest"
+TAG="latest"
+BACK_IMAGE="${DOCKER_USER}/travel-back:${TAG}"
+FRONT_IMAGE="${DOCKER_USER}/travel-front:${TAG}"
+ALL_IMAGE="${DOCKER_USER}/travel-all:${TAG}"
 CONTAINER_NAME="travel-app"
 MYSQL_VOLUME="travel_mysql_data"
 
@@ -25,10 +30,13 @@ info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
 success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 
+# ── 스크립트 위치 기준 프로젝트 루트 ────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " 국내 여행지 추천 서비스 — 자동 배포 스크립트"
-echo " 이미지: ${IMAGE}"
+echo " 국내 여행지 추천 서비스 — 빌드 & 배포 스크립트"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -37,7 +45,6 @@ if ! command -v docker &>/dev/null; then
     warn "Docker 가 설치되어 있지 않습니다. 자동 설치를 시작합니다..."
 
     if command -v apt-get &>/dev/null; then
-        # ── Ubuntu / Debian ─────────────────────────────────────
         info "Ubuntu/Debian 환경 감지 → Docker 설치 중..."
         sudo apt-get update -y -qq
         sudo apt-get install -y -qq ca-certificates curl gnupg lsb-release
@@ -57,7 +64,6 @@ $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         sudo usermod -aG docker "$USER" 2>/dev/null || true
 
     elif command -v yum &>/dev/null; then
-        # ── Amazon Linux 2 / CentOS / RHEL ─────────────────────
         info "Amazon Linux/RHEL 환경 감지 → Docker 설치 중..."
         sudo yum update -y -q
         sudo yum install -y -q docker
@@ -78,42 +84,79 @@ fi
 
 success "Docker $(docker --version | awk '{print $3}' | tr -d ',') 확인"
 
-# ── [Step 2] 기존 컨테이너 정리 ─────────────────────────────────
-info "기존 컨테이너(${CONTAINER_NAME}) 정리 중..."
-docker stop  "${CONTAINER_NAME}" 2>/dev/null && \
-    success "${CONTAINER_NAME} 컨테이너 중지" || true
-docker rm    "${CONTAINER_NAME}" 2>/dev/null && \
-    success "${CONTAINER_NAME} 컨테이너 삭제" || true
-
-# ── [Step 3] 최신 이미지 Pull ────────────────────────────────────
+# ── [Step 2] DockerHub 로그인 ────────────────────────────────────
 echo ""
-info "DockerHub 에서 이미지 다운로드 중..."
-info "  ${IMAGE}"
-docker pull "${IMAGE}"
-success "이미지 pull 완료"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 2] DockerHub 로그인 (${DOCKER_USER})"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker login
+success "DockerHub 로그인 완료"
 
-# ── [Step 4] 컨테이너 실행 ──────────────────────────────────────
+# ── [Step 3] 이미지 빌드 ─────────────────────────────────────────
 echo ""
-info "컨테이너 시작..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 3-1] 백엔드 이미지 빌드 → ${BACK_IMAGE}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker build ./back -t "${BACK_IMAGE}"
+success "백엔드 이미지 빌드 완료"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 3-2] 프론트엔드 이미지 빌드 → ${FRONT_IMAGE}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker build ./front -t "${FRONT_IMAGE}"
+success "프론트엔드 이미지 빌드 완료"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 3-3] All-in-One 이미지 빌드 → ${ALL_IMAGE}"
+info "          (MySQL + FastAPI + Streamlit 단일 컨테이너)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker build -f Dockerfile.all -t "${ALL_IMAGE}" .
+success "All-in-One 이미지 빌드 완료"
+
+# ── [Step 4] DockerHub 푸시 ──────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 4] 이미지 DockerHub 푸시"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker push "${BACK_IMAGE}"
+success "${BACK_IMAGE} 푸시 완료"
+
+docker push "${FRONT_IMAGE}"
+success "${FRONT_IMAGE} 푸시 완료"
+
+docker push "${ALL_IMAGE}"
+success "${ALL_IMAGE} 푸시 완료"
+
+# ── [Step 5] 기존 컨테이너 정리 후 실행 ─────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 5] 컨테이너 실행"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+docker stop "${CONTAINER_NAME}" 2>/dev/null && \
+    success "기존 컨테이너 중지" || true
+docker rm   "${CONTAINER_NAME}" 2>/dev/null && \
+    success "기존 컨테이너 삭제" || true
+
 docker run -d \
-    --name  "${CONTAINER_NAME}" \
+    --name "${CONTAINER_NAME}" \
     --restart unless-stopped \
     -p 8501:8501 \
     -p 8000:8000 \
     -v "${MYSQL_VOLUME}:/var/lib/mysql" \
-    "${IMAGE}"
+    "${ALL_IMAGE}"
 
 success "컨테이너 시작 완료"
 
-# ── [Step 5] 접속 URL 출력 ───────────────────────────────────────
-# EC2 메타데이터에서 퍼블릭 IP 가져오기 (실패하면 로컬호스트)
+# ── [Step 6] 접속 URL 출력 ───────────────────────────────────────
 PUBLIC_IP=$(curl -s --max-time 3 \
     http://169.254.169.254/latest/meta-data/public-ipv4 \
     2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "${GREEN} 배포 완료!${RESET}"
+echo -e "${GREEN} 빌드 & 배포 완료!${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo -e "  Streamlit (프론트)  →  ${CYAN}http://${PUBLIC_IP}:8501${RESET}"
@@ -124,6 +167,11 @@ echo "   docker ps                          # 실행 중인 컨테이너 확인"
 echo "   docker logs -f ${CONTAINER_NAME}   # 실시간 로그"
 echo "   docker stop  ${CONTAINER_NAME}     # 서비스 중지"
 echo "   docker start ${CONTAINER_NAME}     # 서비스 재시작"
+echo ""
+echo " DockerHub 이미지:"
+echo "   ${BACK_IMAGE}"
+echo "   ${FRONT_IMAGE}"
+echo "   ${ALL_IMAGE}"
 echo ""
 echo " EC2 보안그룹 인바운드 허용 확인:"
 echo "   포트 8501 (Streamlit) / 8000 (FastAPI)"
