@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: travel_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: travel_rec
+      MYSQL_USER: recuser
+      MYSQL_PASSWORD: recpass
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  back:
+    build: ./back
+    container_name: travel_back
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: recuser
+      DB_PASSWORD: recpass
+      DB_NAME: travel_rec
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  front:
+    build: ./front
+    container_name: travel_front
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://back:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - back
+
+volumes:
+  mysql_data:
