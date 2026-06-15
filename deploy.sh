@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
-#  deploy.sh  ─  단 하나의 명령으로 빌드 → 푸시 → 실행까지 완료
+#  deploy.sh  ─  단 하나의 명령으로 최신화 → 빌드 → 푸시 → 실행
 #
 #  사용법 (레포 클론 후 EC2 에서 실행):
 #    bash deploy.sh
 #
 #  이 스크립트는 다음을 자동으로 수행합니다:
 #    1. Docker 미설치 시 자동 설치 (Ubuntu / Amazon Linux 2)
-#    2. DockerHub 로그인
-#    3. 백엔드 / 프론트엔드 / All-in-One 이미지 빌드
-#    4. 세 이미지 DockerHub 푸시
-#    5. 기존 컨테이너 정리 후 새 컨테이너 실행
-#    6. 접속 URL 안내
+#    2. GitHub 최신 코드 강제 동기화 (로컬 변경사항 전부 덮어씀)
+#    3. DockerHub 로그인
+#    4. 백엔드 / 프론트엔드 / All-in-One 이미지 빌드
+#    5. 세 이미지 DockerHub 푸시
+#    6. 기존 컨테이너 및 볼륨 완전 삭제
+#    7. 새 컨테이너 실행
+#    8. 접속 URL 안내
 # ─────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -84,41 +86,54 @@ fi
 
 success "Docker $(docker --version | awk '{print $3}' | tr -d ',') 확인"
 
-# ── [Step 2] DockerHub 로그인 ────────────────────────────────────
+# ── [Step 2] GitHub 최신 코드 강제 동기화 ───────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 2] DockerHub 로그인 (${DOCKER_USER})"
+info "[Step 2] GitHub 최신 코드 강제 동기화"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if command -v git &>/dev/null && [ -d ".git" ]; then
+    git fetch origin
+    git reset --hard origin/main
+    success "GitHub origin/main 기준으로 강제 동기화 완료"
+else
+    warn "git 저장소가 아니거나 git 미설치 — 코드 동기화 건너뜀"
+fi
+
+# ── [Step 3] DockerHub 로그인 ────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 3] DockerHub 로그인 (${DOCKER_USER})"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker login
 success "DockerHub 로그인 완료"
 
-# ── [Step 3] 이미지 빌드 ─────────────────────────────────────────
+# ── [Step 4] 이미지 빌드 ─────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 3-1] 백엔드 이미지 빌드 → ${BACK_IMAGE}"
+info "[Step 4-1] 백엔드 이미지 빌드 → ${BACK_IMAGE}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker build ./back -t "${BACK_IMAGE}"
 success "백엔드 이미지 빌드 완료"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 3-2] 프론트엔드 이미지 빌드 → ${FRONT_IMAGE}"
+info "[Step 4-2] 프론트엔드 이미지 빌드 → ${FRONT_IMAGE}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker build ./front -t "${FRONT_IMAGE}"
 success "프론트엔드 이미지 빌드 완료"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 3-3] All-in-One 이미지 빌드 → ${ALL_IMAGE}"
+info "[Step 4-3] All-in-One 이미지 빌드 → ${ALL_IMAGE}"
 info "          (MySQL + FastAPI + Streamlit 단일 컨테이너)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker build -f Dockerfile.all -t "${ALL_IMAGE}" .
 success "All-in-One 이미지 빌드 완료"
 
-# ── [Step 4] DockerHub 푸시 ──────────────────────────────────────
+# ── [Step 5] DockerHub 푸시 ──────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 4] 이미지 DockerHub 푸시"
+info "[Step 5] 이미지 DockerHub 푸시"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker push "${BACK_IMAGE}"
 success "${BACK_IMAGE} 푸시 완료"
@@ -129,16 +144,23 @@ success "${FRONT_IMAGE} 푸시 완료"
 docker push "${ALL_IMAGE}"
 success "${ALL_IMAGE} 푸시 완료"
 
-# ── [Step 5] 기존 컨테이너 정리 후 실행 ─────────────────────────
+# ── [Step 6] 기존 컨테이너 및 볼륨 완전 삭제 ────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-info "[Step 5] 컨테이너 실행"
+info "[Step 6] 기존 컨테이너 및 MySQL 볼륨 삭제"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker stop "${CONTAINER_NAME}" 2>/dev/null && \
     success "기존 컨테이너 중지" || true
 docker rm   "${CONTAINER_NAME}" 2>/dev/null && \
     success "기존 컨테이너 삭제" || true
+docker volume rm "${MYSQL_VOLUME}" 2>/dev/null && \
+    success "MySQL 볼륨 삭제 (새 이미지로 DB 재초기화)" || true
 
+# ── [Step 7] 새 컨테이너 실행 ───────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "[Step 7] 새 컨테이너 실행"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 docker run -d \
     --name "${CONTAINER_NAME}" \
     --restart unless-stopped \
@@ -149,7 +171,7 @@ docker run -d \
 
 success "컨테이너 시작 완료"
 
-# ── [Step 6] 접속 URL 출력 ───────────────────────────────────────
+# ── [Step 8] 접속 URL 출력 ───────────────────────────────────────
 PUBLIC_IP=$(curl -s --max-time 3 \
     http://169.254.169.254/latest/meta-data/public-ipv4 \
     2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
