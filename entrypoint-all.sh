@@ -13,20 +13,22 @@ fi
 # MySQL 백그라운드 시작
 mysqld_safe --user=mysql &
 
-# MySQL 준비 대기
+# MySQL 준비 대기 — 소켓 방식으로 확인
+# (Ubuntu MySQL root 계정은 auth_socket 플러그인 사용 → TCP 인증 불가)
 echo "MySQL 준비 대기 중..."
 for i in $(seq 1 60); do
-    if mysqladmin ping -h 127.0.0.1 --silent 2>/dev/null; then
+    if mysqladmin ping --socket=/var/run/mysqld/mysqld.sock --silent 2>/dev/null; then
         echo "MySQL 준비 완료"
         break
     fi
     sleep 1
 done
 
-# DB/유저 초기화
-mysql -h 127.0.0.1 -u root <<'SQL'
+# DB/유저 초기화 — 소켓으로 root 접속
+mysql --socket=/var/run/mysqld/mysqld.sock -u root <<'SQL'
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
 CREATE DATABASE IF NOT EXISTS travel_rec;
-CREATE USER IF NOT EXISTS 'recuser'@'%' IDENTIFIED BY 'recpass';
+CREATE USER IF NOT EXISTS 'recuser'@'%' IDENTIFIED WITH mysql_native_password BY 'recpass';
 GRANT ALL PRIVILEGES ON travel_rec.* TO 'recuser'@'%';
 FLUSH PRIVILEGES;
 USE travel_rec;
