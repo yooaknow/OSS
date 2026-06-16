@@ -46,8 +46,6 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_URL: http://back:8000
-    volumes:
-      - ./front:/app
     ports:
       - "8501:8501"
     depends_on:

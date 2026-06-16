@@ -92,6 +92,13 @@ else
     warn "git 저장소가 아니거나 git 미설치 — 코드 동기화 건너뜀"
 fi
 
+if [ ! -f "front/assets/onboarding.png" ]; then
+    echo "front/assets/onboarding.png 파일을 찾을 수 없습니다."
+    echo "레포가 최신 상태인지, assets 파일들이 커밋되어 있는지 확인하세요."
+    exit 1
+fi
+success "프론트 assets 확인 완료"
+
 # ── [Step 3] Docker 캐시 정리 (디스크 공간 확보) ────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -113,7 +120,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 info "[Step 5] 백엔드 / 프론트엔드 이미지 빌드"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-docker compose build
+docker compose build --pull --no-cache
 success "이미지 빌드 완료"
 
 # ── [Step 6] DockerHub 푸시 ──────────────────────────────────────
@@ -136,7 +143,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 info "[Step 8] 서비스 시작 (db + back + front)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-docker compose up -d
+docker compose up -d --force-recreate
 success "모든 서비스 시작 완료"
 
 echo ""
