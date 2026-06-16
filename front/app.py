@@ -321,7 +321,7 @@ def inject_base_style():
                 position: absolute;
                 left: 9%;
                 right: 9%;
-                top: 4%;
+                top: 6%;
                 bottom: 7%;
                 color: #35211A;
                 text-align: center;
@@ -420,7 +420,7 @@ def inject_base_style():
                     font-size: 1.9rem;
                 }
                 .result-layer {
-                    top: 5%;
+                    top: 6%;
                 }
                 .result-summary {
                     font-size: 0.9rem;
