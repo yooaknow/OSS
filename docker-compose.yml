@@ -22,7 +22,7 @@ services:
 
   back:
     build: ./back
-    image: yooahreaum/travel-back:latest
+    image: yooahreaum/moodbrew-back:latest
     container_name: moodbrew-back
     restart: unless-stopped
     environment:
@@ -39,7 +39,7 @@ services:
 
   front:
     build: ./front
-    image: yooahreaum/travel-front:latest
+    image: yooahreaum/moodbrew-front:latest
     container_name: moodbrew-front
     restart: unless-stopped
     environment:

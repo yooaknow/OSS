@@ -11,8 +11,8 @@ set -euo pipefail
 DOCKER_USER="yooahreaum"
 TAG="latest"
 
-BACK_IMAGE="${DOCKER_USER}/travel-back:${TAG}"
-FRONT_IMAGE="${DOCKER_USER}/travel-front:${TAG}"
+BACK_IMAGE="${DOCKER_USER}/moodbrew-back:${TAG}"
+FRONT_IMAGE="${DOCKER_USER}/moodbrew-front:${TAG}"
 ALL_IMAGE="${DOCKER_USER}/travel-all:${TAG}"
 
 # ── 스크립트 위치 기준으로 프로젝트 루트로 이동 ──────────────────
