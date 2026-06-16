@@ -1,7 +1,7 @@
 services:
   db:
     image: mysql:8.0
-    container_name: travel_db
+    container_name: moodbrew-db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -23,7 +23,7 @@ services:
   back:
     build: ./back
     image: yooahreaum/travel-back:latest
-    container_name: travel_back
+    container_name: moodbrew-back
     restart: unless-stopped
     environment:
       DB_HOST: db
@@ -40,7 +40,7 @@ services:
   front:
     build: ./front
     image: yooahreaum/travel-front:latest
-    container_name: travel_front
+    container_name: moodbrew-front
     restart: unless-stopped
     environment:
       BACKEND_URL: http://back:8000
