@@ -321,7 +321,7 @@ def inject_base_style():
                 position: absolute;
                 left: 9%;
                 right: 9%;
-                top: 6%;
+                top: 25%;
                 bottom: 7%;
                 color: #35211A;
                 text-align: center;
@@ -420,7 +420,7 @@ def inject_base_style():
                     font-size: 1.9rem;
                 }
                 .result-layer {
-                    top: 6%;
+                    top: 22%;
                 }
                 .result-summary {
                     font-size: 0.9rem;
@@ -542,7 +542,6 @@ def render_result():
         <div class="mood-screen">
             <img src="{image_to_data_uri(background)}" alt="Mood Brew result">
             <div class="result-layer">
-                <p class="result-summary">{html.escape(data["summary"])}</p>
                 <div class="result-card">
                     <div>{menu_image_html}</div>
                     <div>
